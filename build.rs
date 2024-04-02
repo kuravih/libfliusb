@@ -6,8 +6,10 @@ use std::{env, path::PathBuf};
 use bindgen::CargoCallbacks;
 
 fn main() {
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     // Compile the C library
     let files = [
+        "libfli.c",
         "libfli-camera.c",
         "libfli-camera-parport.c",
         "libfli-camera-usb.c",
@@ -29,7 +31,7 @@ fn main() {
                 .expect("Cannot parse path")
         })
         .collect::<Vec<PathBuf>>();
-
+    
     cc::Build::new()
         .opt_level(3)
         .flag("-pthread")
@@ -37,6 +39,7 @@ fn main() {
         .files(files)
         .include("clib")
         .include("clib/unix")
+        .out_dir(&out_path)
         .compile("libfli-usb.a");
     // This is the directory where the `c` library is located.
     // Canonicalize the path as `rustc-link-search` requires an absolute path.
@@ -50,7 +53,7 @@ fn main() {
     let headers_path_str = headers_path.to_str().expect("Path is not a valid string");
 
     // Tell cargo to look for shared libraries in the specified directory
-    println!("cargo:rustc-link-search={}", libdir_path.to_str().unwrap());
+    println!("cargo:rustc-link-search={}", out_path.to_str().unwrap());
 
     // Tell cargo to tell rustc to link our `hello` library. Cargo will
     // automatically know it must look for a `libhello.a` file.
@@ -76,7 +79,6 @@ fn main() {
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let out_path = out_path.join("bindings.rs");
 
