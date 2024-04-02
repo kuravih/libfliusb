@@ -1,7 +1,2 @@
+/target
 **/.DS_Store
-**/*.o
-**/*.d
-**/*.out
-**/*.a
-**/*.dylib
-**/*.so
