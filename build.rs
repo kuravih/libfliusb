@@ -5,6 +5,12 @@ use std::{env, path::PathBuf};
 
 use bindgen::CargoCallbacks;
 
+#[cfg(target_os="windows")]
+fn main() {
+    panic!("This crate does not support Windows");
+}
+
+#[cfg(not(target_os="windows"))]
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     // Compile the C library
@@ -20,7 +26,10 @@ fn main() {
         "unix/libfli-debug.c",
         "unix/libfli-serial.c",
         "unix/libfli-sys.c",
+        #[cfg(target_os = "linux")]
         "unix/libusb/libfli-usb-sys.c",
+        #[cfg(target_os = "macos")]
+        "unix/osx/libfli-usb-sys.c",
     ];
 
     let files = files
@@ -31,16 +40,22 @@ fn main() {
                 .expect("Cannot parse path")
         })
         .collect::<Vec<PathBuf>>();
-    
-    cc::Build::new()
+
+    let mut builder = cc::Build::new();
+    builder
         .opt_level(3)
         .flag("-pthread")
         .flag("-D__LIBUSB__")
         .files(files)
         .include("clib")
         .include("clib/unix")
-        .out_dir(&out_path)
-        .compile("libfli-usb.a");
+        .include("clib/unix/osx")
+        .out_dir(&out_path);
+    #[cfg(target_os = "macos")]
+    {
+        builder.include("clib/unix/osx");
+    }
+    builder.compile("libfli-usb.a");
     // This is the directory where the `c` library is located.
     // Canonicalize the path as `rustc-link-search` requires an absolute path.
     let libdir_path = PathBuf::from("clib")
@@ -61,7 +76,10 @@ fn main() {
     println!("cargo:rustc-link-lib=pthread");
     println!("cargo:rustc-link-lib=rt");
     println!("cargo:rustc-link-lib=m");
+    #[cfg(target_os = "linux")]
     println!("cargo:rustc-link-lib=usb-1.0");
+    #[cfg(target_os = "macos")]
+    println!("cargo:rustc-link-lib=framework=IOKit");
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for

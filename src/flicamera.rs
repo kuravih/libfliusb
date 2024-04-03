@@ -97,7 +97,6 @@ pub fn get_camera_ids() -> Result<Vec<String>, Error> {
                 })?
                 .to_string(),
         );
-        if cstr.to_str().is_ok() {}
         i += 1;
     }
     unsafe { FLIFreeList(ptr) };
@@ -193,11 +192,11 @@ impl CameraInfo for CameraInfoFLI {
     }
 
     fn get_ccd_width(&self) -> u32 {
-        self.width as u32
+        self.width
     }
 
     fn get_ccd_height(&self) -> u32 {
-        self.height as u32
+        self.height
     }
 
     fn get_uuid(&self) -> Option<&str> {
@@ -223,27 +222,160 @@ impl CameraInfo for CameraInfoFLI {
     }
 }
 
+impl CameraInfo for CameraUnitFLI {
+    fn camera_ready(&self) -> bool {
+        true
+    }
+
+    fn camera_name(&self) -> &str {
+        self.info.camera_name()
+    }
+
+    fn cancel_capture(&self) -> Result<(), Error> {
+        self.info.cancel_capture()
+    }
+
+    fn is_capturing(&self) -> bool {
+        self.info.is_capturing()
+    }
+
+    fn get_ccd_width(&self) -> u32 {
+        self.info.height
+    }
+
+    fn get_ccd_height(&self) -> u32 {
+        self.info.height
+    }
+
+    fn get_uuid(&self) -> Option<&str> {
+        self.info.get_uuid()
+    }
+
+    fn set_temperature(&self, temperature: f32) -> Result<f32, Error> {
+        self.info.set_temperature(temperature)
+    }
+
+    fn get_temperature(&self) -> Option<f32> {
+        self.info.get_temperature()
+    }
+
+    fn get_cooler_power(&self) -> Option<f32> {
+        self.info.get_cooler_power()
+    }
+
+    fn get_pixel_size(&self) -> Option<f32> {
+        self.info.get_pixel_size()
+    }
+}
+
+impl CameraUnit for CameraUnitFLI {
+    fn get_handle(&self) -> Option<&dyn std::any::Any> {
+        Some(&self.handle.0)
+    }
+
+    fn get_min_exposure(&self) -> Result<Duration, Error> {
+        Ok(Duration::from_millis(1))
+    }
+
+    fn get_max_exposure(&self) -> Result<Duration, Error> {
+        Ok(Duration::from_secs(3600))
+    }
+
+    fn set_shutter_open(&mut self, open: bool) -> Result<bool, Error> {
+        if self.info.is_capturing() {
+            Err(Error::ExposureInProgress)
+        }
+        else {
+            // FLICALL!(FLISetFrameType(*self.handle.0, if open { FLI_FRAME_TYPE_LIGHT } else { FLI_FRAME_TYPE_DARK }));
+            // self.handle.2 = open;    
+            Ok(open)
+        }
+    }
+
+    fn get_shutter_open(&self) -> Result<bool, Error> {
+        // Ok(self.handle.2)
+        Ok(false)
+    }
+
+    fn set_flip(&mut self, _x: bool, _y: bool) -> Result<(), Error> {
+        Err(Error::Message("Not implemented".to_string()))
+    }
+
+    fn get_flip(&self) -> (bool, bool) {
+        (false, false)
+    }
+
+    fn get_bin_x(&self) -> u32 {
+        self.roi.bin_x
+    }
+
+    fn get_bin_y(&self) -> u32 {
+        self.roi.bin_y
+    }
+
+    fn get_status(&self) -> String {
+        "Not implemented".to_string()
+    }
+
+    fn get_vendor(&self) -> &str {
+        "FLI"
+    }
+
+    fn capture_image(&self) -> Result<DynamicSerialImage, Error> {
+        todo!()
+    }
+
+    fn start_exposure(&self) -> Result<(), Error> {
+        FLICALL!(FLIExposeFrame(*self.handle.0));
+        Ok(())
+    }
+
+    fn download_image(&self) -> Result<DynamicSerialImage, Error> {
+        todo!()
+    }
+
+    fn image_ready(&self) -> Result<bool, Error> {
+        todo!()
+    }
+
+    fn set_exposure(&mut self, _exposure: Duration) -> Result<Duration, Error> {
+        todo!()
+    }
+
+    fn get_exposure(&self) -> Duration {
+        todo!()
+    }
+
+    fn set_roi(&mut self, roi: &ROI) -> Result<&ROI, Error> {
+        todo!()
+    }
+
+    fn get_roi(&self) -> &ROI {
+        &self.roi
+    }
+}
+
 fn get_temperature(handle: &FLIHandle) -> Result<f64, Error> {
     let mut temp: f64 = 0.0;
     FLICALL!(FLIGetTemperature(*handle.0, &mut temp));
-    Ok(temp as f64)
+    Ok(temp)
 }
 
 fn set_temperature(handle: &FLIHandle, temp: f64) -> Result<(), Error> {
-    if !(temp >= -55.0 && temp <= 45.0) {
+    if !(-55.0..=45.0).contains(&temp) {
         return Err(Error::InvalidValue(format!(
             "Invalid temperature value {}",
             temp
         )));
     }
-    FLICALL!(FLISetTemperature(*handle.0, temp as f64));
+    FLICALL!(FLISetTemperature(*handle.0, temp));
     Ok(())
 }
 
 fn get_cooler_power(handle: &FLIHandle) -> Result<f64, Error> {
     let mut power: f64 = 0.0;
     FLICALL!(FLIGetCoolerPower(*handle.0, &mut power));
-    Ok(power as f64)
+    Ok(power)
 }
 
 fn get_model(handle: &FLIHandle) -> Result<String, Error> {
