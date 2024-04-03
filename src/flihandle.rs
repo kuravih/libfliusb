@@ -1,5 +1,4 @@
-#![warn(missing_docs)]
-
+#![allow(unused)]
 use std::{
     ffi::{c_long, CStr},
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
@@ -25,44 +24,44 @@ macro_rules! FLICALL {
 pub const FLIDOMAIN_CAMERA: i64 = (FLIDEVICE_CAMERA | FLIDOMAIN_USB) as i64;
 
 #[derive(Debug)]
-pub struct FLIHandle(
+pub struct FLIHandle {
     /// The handle to the camera.
-    pub flidev_t,
+    pub dev: flidev_t,
     /// The exposure time.
-    pub AtomicU64,
+    pub exp: AtomicU64,
     /// capturing
-    pub AtomicBool,
+    pub capturing: AtomicBool,
     /// image ready
-    pub AtomicBool,
+    pub ready: AtomicBool,
     /// dark
-    pub AtomicBool,
-);
+    pub dark: AtomicBool,
+}
 
 impl FLIHandle {
     pub fn new(handle: flidev_t) -> Self {
-        FLIHandle(
-            handle,
-            AtomicU64::new(100),
-            AtomicBool::new(false),
-            AtomicBool::new(false),
-            AtomicBool::new(false),
-        )
+        FLIHandle {
+            dev: handle,
+            exp: AtomicU64::new(100),
+            capturing: AtomicBool::new(false),
+            ready: AtomicBool::new(false),
+            dark: AtomicBool::new(false),
+        }
     }
 
     pub fn image_ready(&self) -> Result<bool, Error> {
-        let capturing = self.2.load(Ordering::SeqCst);
+        let capturing = self.capturing.load(Ordering::SeqCst);
         if capturing {
             let mut status: c_long = 0;
-            let res = unsafe { FLIGetExposureStatus(self.0, &mut status) };
+            let res = unsafe { FLIGetExposureStatus(self.dev, &mut status) };
             if res != 0 {
-                self.2.store(false, Ordering::SeqCst);
+                self.capturing.store(false, Ordering::SeqCst);
                 return Err(Error::ExposureFailed(format!(
                     "Error getting exposure status: {}",
                     res
                 )));
             }
-            if status > 0 {
-                self.3.store(true, Ordering::SeqCst);
+            if status == 0 {
+                self.ready.store(true, Ordering::SeqCst);
                 Ok(true)
             } else {
                 Ok(false)
@@ -73,14 +72,14 @@ impl FLIHandle {
     }
 
     pub fn is_capturing(&self) -> Result<bool, Error> {
-        let capturing = self.2.load(Ordering::SeqCst);
+        let capturing = self.capturing.load(Ordering::SeqCst);
         if !capturing {
             return Ok(false);
         }
         let status: c_long = 0;
-        let res = unsafe { FLIGetExposureStatus(self.0, status as *mut c_long) };
+        let res = unsafe { FLIGetExposureStatus(self.dev, status as *mut c_long) };
         if res != 0 {
-            self.2.store(false, Ordering::SeqCst);
+            self.capturing.store(false, Ordering::SeqCst);
             return Err(Error::ExposureFailed(format!(
                 "Error getting exposure status: {}",
                 res
@@ -89,53 +88,53 @@ impl FLIHandle {
         if status > 0 {
             Ok(true)
         } else {
-            self.2.store(false, Ordering::SeqCst);
-            self.3.store(true, Ordering::SeqCst);
+            self.capturing.store(false, Ordering::SeqCst);
+            self.ready.store(true, Ordering::SeqCst);
             Ok(false)
         }
     }
 
     pub fn cancel_capture(&self) -> Result<(), Error> {
-        FLICALL!(FLICancelExposure(self.0));
-        self.2.store(false, Ordering::SeqCst);
-        self.3.store(false, Ordering::SeqCst);
+        FLICALL!(FLICancelExposure(self.dev));
+        self.capturing.store(false, Ordering::SeqCst);
+        self.ready.store(false, Ordering::SeqCst);
         Ok(())
     }
 
     pub fn get_temperature(&self) -> Result<f32, Error> {
-        let mut temp: f64 = 0.0;
-        FLICALL!(FLIGetTemperature(self.0, &mut temp));
+        let mut temp: f64 = 0.;
+        FLICALL!(FLIGetTemperature(self.dev, &mut temp));
         Ok(temp as f32)
     }
 
     pub fn set_temperature(&self, temp: f32) -> Result<(), Error> {
-        if !(-55.0..=45.0).contains(&temp) {
+        if !(-55.0..=45.).contains(&temp) {
             return Err(Error::InvalidValue(format!(
                 "Invalid temperature value {}",
                 temp
             )));
         }
-        FLICALL!(FLISetTemperature(self.0, temp as f64));
+        FLICALL!(FLISetTemperature(self.dev, temp as f64));
         Ok(())
     }
 
     pub fn get_cooler_power(&self) -> Result<f64, Error> {
-        let mut power: f64 = 0.0;
-        FLICALL!(FLIGetCoolerPower(self.0, &mut power));
+        let mut power: f64 = 0.;
+        FLICALL!(FLIGetCoolerPower(self.dev, &mut power));
         Ok(power)
     }
 
     pub fn get_model(&self) -> Result<String, Error> {
         let mut model = [0i8; 128];
-        FLICALL!(FLIGetModel(self.0, model.as_mut_ptr(), model.len()));
+        FLICALL!(FLIGetModel(self.dev, model.as_mut_ptr(), model.len()));
         let model = unsafe { CStr::from_ptr(model.as_ptr()) };
         Ok(model.to_string_lossy().to_string())
     }
 
     pub fn set_exposure(&self, time: Duration) -> Result<(), Error> {
         let ctime = time.as_millis() as c_long;
-        FLICALL!(FLISetExposureTime(self.0, ctime));
-        self.1.store(time.as_millis() as u64, Ordering::SeqCst);
+        FLICALL!(FLISetExposureTime(self.dev, ctime));
+        self.exp.store(time.as_millis() as u64, Ordering::SeqCst);
         Ok(())
     }
 
@@ -145,12 +144,8 @@ impl FLIHandle {
         let mut lr_x: c_long = 0;
         let mut lr_y: c_long = 0;
         FLICALL!(FLIGetVisibleArea(
-            self.0, &mut ul_x, &mut ul_y, &mut lr_x, &mut lr_y
+            self.dev, &mut ul_x, &mut ul_y, &mut lr_x, &mut lr_y
         ));
-        println!(
-            "ul_x: {}, ul_y: {}, lr_x: {}, lr_y: {}",
-            ul_x, ul_y, lr_x, lr_y
-        );
         Ok((ul_x as i32, ul_y as i32, lr_x as i32, lr_y as i32))
     }
 
@@ -159,7 +154,7 @@ impl FLIHandle {
         let ul_y = roi.y_min as c_long;
         let lr_x = (roi.x_min + roi.width) as c_long;
         let lr_y = (roi.y_min + roi.height) as c_long;
-        FLICALL!(FLISetImageArea(self.0, ul_x, ul_y, lr_x, lr_y));
+        FLICALL!(FLISetImageArea(self.dev, ul_x, ul_y, lr_x, lr_y));
         Ok(())
     }
 
@@ -171,7 +166,7 @@ impl FLIHandle {
         let mut voffset: c_long = 0;
         let mut vbin: c_long = 0;
         FLICALL!(FLIGetReadoutDimensions(
-            self.0,
+            self.dev,
             &mut width,
             &mut hoffset,
             &mut hbin,
@@ -198,7 +193,7 @@ impl FLIHandle {
                 bin
             )));
         }
-        FLICALL!(FLISetHBin(self.0, bin as c_long));
+        FLICALL!(FLISetHBin(self.dev, bin as c_long));
         Ok(())
     }
 
@@ -209,14 +204,14 @@ impl FLIHandle {
                 bin
             )));
         }
-        FLICALL!(FLISetVBin(self.0, bin as c_long));
+        FLICALL!(FLISetVBin(self.dev, bin as c_long));
         Ok(())
     }
 
     pub fn get_serial(&self) -> Result<String, Error> {
         let mut serial = [0i8; 128];
         FLICALL!(FLIGetSerialString(
-            self.0,
+            self.dev,
             serial.as_mut_ptr(),
             serial.len()
         ));
@@ -227,9 +222,9 @@ impl FLIHandle {
     pub fn get_camera_mode(&self) -> Result<(c_long, String), Error> {
         let mut mode = [0i8; 128];
         let mut modec: flimode_t = 0;
-        FLICALL!(FLIGetCameraMode(self.0, &mut modec));
+        FLICALL!(FLIGetCameraMode(self.dev, &mut modec));
         FLICALL!(FLIGetCameraModeString(
-            self.0,
+            self.dev,
             modec,
             mode.as_mut_ptr(),
             mode.len()
@@ -242,7 +237,7 @@ impl FLIHandle {
         let mut modes = [0i8; 128];
         let mut mode_list = Vec::new();
         for i in 0..128 {
-            let res = unsafe { FLIGetCameraModeString(self.0, i, modes.as_mut_ptr(), modes.len()) };
+            let res = unsafe { FLIGetCameraModeString(self.dev, i, modes.as_mut_ptr(), modes.len()) };
             if res != 0 {
                 break;
             }
@@ -253,14 +248,14 @@ impl FLIHandle {
     }
 
     pub fn set_camera_mode(&self, mode: flimode_t) -> Result<(), Error> {
-        FLICALL!(FLISetCameraMode(self.0, mode));
+        FLICALL!(FLISetCameraMode(self.dev, mode));
         Ok(())
     }
 
     pub fn get_pixel_size(&self) -> Result<(f64, f64), Error> {
-        let mut x: f64 = 0.0;
-        let mut y: f64 = 0.0;
-        FLICALL!(FLIGetPixelSize(self.0, &mut x, &mut y));
+        let mut x: f64 = 0.;
+        let mut y: f64 = 0.;
+        FLICALL!(FLIGetPixelSize(self.dev, &mut x, &mut y));
         Ok((x, y))
     }
 }

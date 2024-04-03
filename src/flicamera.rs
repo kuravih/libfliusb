@@ -1,16 +1,9 @@
 #![warn(missing_docs)]
 
 use std::{
-    collections::HashMap,
-    ffi::{c_long, c_uchar, CStr, CString},
-    fmt::Display,
-    mem::{transmute, MaybeUninit},
-    os::raw,
+    ffi::{c_void, CStr, CString},
     str,
-    sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc, Mutex,
-    },
+    sync::{atomic::Ordering, Arc},
     thread::sleep,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -20,7 +13,7 @@ use crate::fli_ffi::*;
 use cameraunit::{
     CameraInfo, CameraUnit, DynamicSerialImage, Error, ImageMetaData, SerialImageBuffer, ROI,
 };
-use log::{info, warn};
+use log::warn;
 
 use crate::flihandle::*;
 
@@ -49,12 +42,12 @@ pub struct CameraInfoFLI {
 
 impl Drop for FLIHandle {
     fn drop(&mut self) {
-        let handle = self.0;
+        let handle = self.dev;
         let res = unsafe { FLICancelExposure(handle) };
         if res != 0 {
             warn!("Error cancelling exposure: {}", res);
         }
-        unsafe { FLIClose(self.0) };
+        unsafe { FLIClose(self.dev) };
     }
 }
 
@@ -182,7 +175,7 @@ impl CameraInfo for CameraInfoFLI {
     }
 
     fn get_temperature(&self) -> Option<f32> {
-        self.handle.get_temperature().ok().map(|x| x as f32)
+        self.handle.get_temperature().ok()
     }
 
     fn set_temperature(&self, temp: f32) -> Result<f32, Error> {
@@ -248,7 +241,7 @@ impl CameraInfo for CameraUnitFLI {
 
 impl CameraUnit for CameraUnitFLI {
     fn get_handle(&self) -> Option<&dyn std::any::Any> {
-        Some(&self.handle.0)
+        Some(&self.handle.dev)
     }
 
     fn get_min_exposure(&self) -> Result<Duration, Error> {
@@ -263,14 +256,21 @@ impl CameraUnit for CameraUnitFLI {
         if self.info.is_capturing() {
             Err(Error::ExposureInProgress)
         } else {
-            FLICALL!(FLISetFrameType(self.handle.0, if open { FLI_FRAME_TYPE_NORMAL as i64 } else { FLI_FRAME_TYPE_DARK as i64 }));
-            self.handle.4.store(open, Ordering::SeqCst);
+            FLICALL!(FLISetFrameType(
+                self.handle.dev,
+                if open {
+                    FLI_FRAME_TYPE_NORMAL as i64
+                } else {
+                    FLI_FRAME_TYPE_DARK as i64
+                }
+            ));
+            self.handle.dark.store(open, Ordering::SeqCst);
             Ok(open)
         }
     }
 
     fn get_shutter_open(&self) -> Result<bool, Error> {
-        Ok(self.handle.4.load(Ordering::SeqCst))
+        Ok(self.handle.dark.load(Ordering::SeqCst))
     }
 
     fn set_flip(&mut self, _x: bool, _y: bool) -> Result<(), Error> {
@@ -302,10 +302,11 @@ impl CameraUnit for CameraUnitFLI {
     }
 
     fn start_exposure(&self) -> Result<(), Error> {
-        if !self.handle.2.load(Ordering::SeqCst) {
-            self.handle.2.store(true, Ordering::SeqCst);
-            FLICALL!(FLIExposeFrame(self.handle.0));
-            self.handle.3.store(false, Ordering::SeqCst);
+        if !self.handle.capturing.load(Ordering::SeqCst) {
+            self.handle.capturing.store(true, Ordering::SeqCst);
+            FLICALL!(FLIExposeFrame(self.handle.dev));
+            self.handle.ready.store(false, Ordering::SeqCst);
+            sleep(Duration::from_millis(100));
             Ok(())
         } else {
             Err(Error::ExposureInProgress)
@@ -313,7 +314,45 @@ impl CameraUnit for CameraUnitFLI {
     }
 
     fn download_image(&self) -> Result<DynamicSerialImage, Error> {
-        todo!()
+        let rdy = self.handle.image_ready()?;
+        if rdy {
+            let width = self.roi.width;
+            let height = self.roi.height;
+            let mut buf = vec![0u16; (width * height) as usize];
+            let mut grabbed = 0;
+            let res = unsafe {
+                FLIGrabFrame(
+                    self.handle.dev,
+                    buf.as_mut_ptr() as *mut c_void,
+                    (width * height * 2) as usize,
+                    &mut grabbed,
+                )
+            };
+            if res != 0 {
+                self.handle.capturing.store(false, Ordering::SeqCst);
+                self.handle.ready.store(false, Ordering::SeqCst);
+                return Err(Error::GeneralError(format!(
+                    "Error grabbing frame: {}",
+                    res
+                )));
+            }
+            println!("Grabbed: {}", grabbed);
+            let mut meta = ImageMetaData::default();
+            meta.timestamp = SystemTime::now();
+            meta.exposure = self.get_exposure();
+            meta.temperature = self.handle.get_temperature()?;
+            meta.camera_name = self.info.camera_name().to_string();
+            meta.bin_x = self.roi.bin_x;
+            meta.bin_y = self.roi.bin_y;
+            meta.img_left = self.roi.x_min;
+            meta.img_top = self.roi.y_min;
+            let mut img = DynamicSerialImage::from_vec_u16(width as usize, height as usize, buf)
+                .map_err(|e| Error::GeneralError(format!("Error creating image: {}", e)))?;
+            img.set_metadata(meta);
+            Ok(img)
+        } else {
+            Err(Error::ExposureInProgress)
+        }
     }
 
     fn image_ready(&self) -> Result<bool, Error> {
@@ -321,7 +360,7 @@ impl CameraUnit for CameraUnitFLI {
     }
 
     fn set_exposure(&mut self, exposure: Duration) -> Result<Duration, Error> {
-        if self.handle.2.load(Ordering::SeqCst) {
+        if self.handle.capturing.load(Ordering::SeqCst) {
             return Err(Error::ExposureInProgress);
         }
         if exposure < self.get_min_exposure()? || exposure > self.get_max_exposure()? {
@@ -335,19 +374,19 @@ impl CameraUnit for CameraUnitFLI {
     }
 
     fn get_exposure(&self) -> Duration {
-        Duration::from_millis(self.handle.1.load(Ordering::SeqCst))
+        Duration::from_millis(self.handle.exp.load(Ordering::SeqCst))
     }
 
     fn set_roi(&mut self, roi: &ROI) -> Result<&ROI, Error> {
         if self.info.is_capturing() {
             Err(Error::ExposureInProgress)
-        }
-        else {
+        } else {
             if roi.width == 0 || roi.height == 0 {
                 return Err(Error::InvalidValue("Invalid ROI".to_string()));
             }
 
-            if roi.width * roi.bin_x > self.info.width || roi.height * roi.bin_y > self.info.height {
+            if roi.width * roi.bin_x > self.info.width || roi.height * roi.bin_y > self.info.height
+            {
                 return Err(Error::InvalidValue("Invalid ROI".to_string()));
             }
 
@@ -357,16 +396,20 @@ impl CameraUnit for CameraUnitFLI {
             let ul_x = self.x_min as i64 + x_min;
             let ul_y = self.y_min as i64 + y_min;
 
-            if ul_x < self.x_min.into() || ul_x >= self.x_max.into() || ul_y < self.y_min.into() || ul_y >= self.y_max.into() {
+            if ul_x < self.x_min.into()
+                || ul_x >= self.x_max.into()
+                || ul_y < self.y_min.into()
+                || ul_y >= self.y_max.into()
+            {
                 return Err(Error::InvalidValue("Invalid ROI".to_string()));
             }
 
             let lr_x = ul_x + roi.width as i64;
             let lr_y = ul_y + roi.height as i64;
 
-            FLICALL!(FLISetImageArea(self.handle.0, ul_x, ul_y, lr_x, lr_y));
-            FLICALL!(FLISetHBin(self.handle.0, roi.bin_x as c_long));
-            FLICALL!(FLISetVBin(self.handle.0, roi.bin_y as c_long));
+            FLICALL!(FLISetImageArea(self.handle.dev, ul_x, ul_y, lr_x, lr_y));
+            self.handle.set_hbin(roi.bin_x)?;
+            self.handle.set_vbin(roi.bin_y)?;
 
             self.roi = self.handle.get_readout_dim()?;
             Ok(&self.roi)
@@ -380,6 +423,8 @@ impl CameraUnit for CameraUnitFLI {
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::c_long;
+
     use super::*;
 
     #[test]
@@ -387,13 +432,13 @@ mod tests {
         let cam = open_first_camera().unwrap();
         let temp = cam.handle.get_temperature().unwrap();
         println!("Temperature: {}", temp);
-        assert!(temp >= -100.0);
+        assert!(temp >= -100.);
     }
 
     #[test]
     fn test_set_temperature() {
         let cam = open_first_camera().unwrap();
-        cam.handle.set_temperature(-20.0).unwrap();
+        cam.handle.set_temperature(-20.).unwrap();
     }
 
     #[test]
@@ -401,7 +446,7 @@ mod tests {
         let cam = open_first_camera().unwrap();
         let power = cam.handle.get_cooler_power().unwrap();
         println!("Cooler power: {}", power);
-        assert!(power >= 0.0);
+        assert!(power >= 0.);
     }
 
     #[test]
@@ -459,5 +504,38 @@ mod tests {
         let cam = open_first_camera().unwrap();
         let mode = cam.handle.list_camera_modes();
         println!("Camera modes: {:?}", mode);
+    }
+
+    #[test]
+    fn test_get_exposure_status() {
+        let mut cam = open_first_camera().unwrap();
+        println!("{}", cam.get_roi());
+        let mut timeleft: c_long = 0;
+        let res = unsafe { FLIGetExposureStatus(cam.handle.dev, &mut timeleft) };
+        println!("Exposure status: {}", res);
+        println!("Time left: {}", timeleft);
+        let res = unsafe { FLIGetDeviceStatus(cam.handle.dev, &mut timeleft) };
+        println!("Device status ({}): {}", res, timeleft);
+        cam.set_exposure(Duration::from_millis(100)).unwrap();
+        cam.set_roi(&ROI {
+            x_min: 100,
+            y_min: 100,
+            width: 300,
+            height: 500,
+            bin_x: 2,
+            bin_y: 2,
+        }).unwrap();
+        cam.start_exposure().unwrap();
+        let res = unsafe { FLIGetExposureStatus(cam.handle.dev, &mut timeleft) };
+        println!("Exposure status: {}, time left: {}", res, timeleft);
+        let mut count = 100;
+        while !cam.image_ready().unwrap() && count > 0 {
+            println!("Waiting for image... {}", count);
+            count -= 1;
+            sleep(Duration::from_millis(100));
+        }
+        println!("Image ready");
+        let img = cam.download_image().unwrap();
+        img.save("test.png").unwrap();
     }
 }

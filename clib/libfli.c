@@ -227,7 +227,35 @@ LIBFLIAPI FLIUsbBulkIO(flidev_t dev, int ep, void *buf, long *len)
 LIBFLIAPI FLIGrabFrame(flidev_t dev, void* buff,
 		       size_t buffsize, size_t* bytesgrabbed)
 {
-	return -EINVAL;
+  CHKDEVICE(dev);
+  long width, hoffset, binx, height, voffset, biny;
+  int res;
+  res = FLIGetReadoutDimensions(dev, &width, &hoffset, &binx,
+                                    &height, &voffset, &biny);
+  if (res != 0)
+  {
+      printf("FLIGrabFrame: FLIGetReadoutDimensions failed\n");
+      return res;
+  }
+
+  if (buffsize < width * height * 2)
+  {
+    printf("FLIGrabFrame: buffer too small: expected %ld, got %lu\n", width * height * 2, buffsize);
+      return -ENOMEM;
+  }
+
+  res = 0;
+  for (long row = 0; row < height; row++)
+  {
+    res |= FLIGrabRow(dev, (char*)buff + row * width * 2, width);
+    if (res != 0)
+    {
+      printf("FLIGrabFrame: FLIGrabRow failed: %ld (%d)\n", row, res);  
+      break; 
+    }
+    *bytesgrabbed += width * 2;
+  }
+  return res;
 }
 
 /**
