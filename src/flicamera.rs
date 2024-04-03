@@ -37,12 +37,13 @@ const FLIDOMAIN_CAMERA: i64 = (FLIDEVICE_CAMERA | FLIDOMAIN_USB) as i64;
 
 #[derive(Debug, Clone)]
 struct FLIHandle(
-    Arc<flidev_t>, // The handle to the camera.
-    Duration,      // The exposure time.
+    flidev_t, // The handle to the camera.
+    Duration, // The exposure time.
+    bool,
 );
 
 pub struct CameraUnitFLI {
-    handle: FLIHandle,
+    handle: Arc<FLIHandle>,
     info: CameraInfoFLI,
     roi: ROI,
     x_min: i32,
@@ -53,7 +54,7 @@ pub struct CameraUnitFLI {
 
 #[derive(Debug, Clone)]
 pub struct CameraInfoFLI {
-    handle: FLIHandle,
+    handle: Arc<FLIHandle>,
     /// CCD width in pixels.
     width: u32,
     /// CCD height in pixels.
@@ -130,7 +131,7 @@ pub fn open_camera(name: &str) -> Result<CameraUnitFLI, Error> {
     if handle == FLI_INVALID_DEVICE.into() {
         return Err(Error::NoCamerasAvailable);
     }
-    let handle = FLIHandle(Arc::new(handle), Duration::from_millis(100));
+    let handle = Arc::new(FLIHandle(handle, Duration::from_millis(100), false));
     let serial = get_serial(&handle)?;
     let (x_min, y_min, x_max, y_max) = get_array_size(&handle)?;
 
@@ -284,10 +285,9 @@ impl CameraUnit for CameraUnitFLI {
     fn set_shutter_open(&mut self, open: bool) -> Result<bool, Error> {
         if self.info.is_capturing() {
             Err(Error::ExposureInProgress)
-        }
-        else {
+        } else {
             // FLICALL!(FLISetFrameType(*self.handle.0, if open { FLI_FRAME_TYPE_LIGHT } else { FLI_FRAME_TYPE_DARK }));
-            // self.handle.2 = open;    
+            // self.handle.2 = open;
             Ok(open)
         }
     }
@@ -326,17 +326,20 @@ impl CameraUnit for CameraUnitFLI {
     }
 
     fn start_exposure(&self) -> Result<(), Error> {
-        FLICALL!(FLIExposeFrame(*self.handle.0));
-        Ok(())
+        if !self.capturing {
+            self.capturing = true;
+            FLICALL!(FLIExposeFrame(*self.handle.0));
+            Ok(())
+        } else {
+            Err(Error::ExposureInProgress)
+        }
     }
 
     fn download_image(&self) -> Result<DynamicSerialImage, Error> {
         todo!()
     }
 
-    fn image_ready(&self) -> Result<bool, Error> {
-        todo!()
-    }
+    fn image_ready(&self) -> Result<bool, Error> {}
 
     fn set_exposure(&mut self, _exposure: Duration) -> Result<Duration, Error> {
         todo!()
