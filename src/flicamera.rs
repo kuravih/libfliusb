@@ -421,7 +421,8 @@ impl CameraUnit for CameraUnitFLI {
                     res
                 )));
             }
-            println!("Grabbed: {}", grabbed);
+            self.handle.capturing.store(false, Ordering::SeqCst);
+            self.handle.ready.store(true, Ordering::SeqCst);
             let mut meta = ImageMetaData::default();
             meta.timestamp = SystemTime::now();
             meta.exposure = self.get_exposure();

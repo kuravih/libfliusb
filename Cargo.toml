@@ -15,11 +15,11 @@ An efficient and ergonomic interface to capture images using cameras.
 """
 exclude = [".github"]
 
-# [[bin]]
-# name = "flicamera_capture"
-# path = "src/main.rs"
-# test = true
-# bench = false
+[[bin]]
+name = "flicamera_capture"
+path = "src/main.rs"
+test = true
+bench = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
