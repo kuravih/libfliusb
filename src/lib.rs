@@ -38,14 +38,12 @@ mod tests {
             return;
         }
         let cam = open_camera(&ids[0]);
-        println!("Camera: {:?}", cam);
         assert!(cam.is_ok());
     }
 
     #[test]
     fn test_open_first_camera() {
         let cam = open_first_camera();
-        println!("Camera: {:?}", cam);
         assert!(cam.is_ok());
     }
 }
