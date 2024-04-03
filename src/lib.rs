@@ -1,5 +1,8 @@
 #![cfg(not(windows))]
 mod fli_ffi;
+#[macro_use]
+mod flihandle;
+
 mod flicamera;
 
 // pub use flicamera::{
