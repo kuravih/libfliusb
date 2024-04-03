@@ -47,6 +47,12 @@
 #include <sys/types.h>
 
 /**
+ * @brief Mark a variable as unused to suppress compiler warnings.
+ * 
+ */
+#define FLI_UNUSED(x) ((void)(x))
+
+/**
  * @brief An opaque handle used by library functions to refer to FLI
  * hardware.
  * 

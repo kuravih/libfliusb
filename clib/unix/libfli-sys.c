@@ -642,6 +642,8 @@ long unix_fli_list_glob(char *pattern, flidomain_t domain,
 
 static long unix_fli_list_parport(flidomain_t domain, char ***names)
 {
+  FLI_UNUSED(domain);
+  FLI_UNUSED(names);
   return -EINVAL;
 //  return unix_fli_list_glob(PARPORT_GLOB, domain, names);
 /* If you still have a parallel port FLI camera, buy a new one or use the older SDK. Functionality didn't

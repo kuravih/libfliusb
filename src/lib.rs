@@ -11,9 +11,14 @@ mod flicamera;
 // };
 
 /// Re-export of [`cameraunit`] crate.
-pub use cameraunit::{CameraInfo, CameraUnit, Error, ROI, DynamicSerialImage, SerialImageBuffer, OptimumExposureConfig, ImageMetaData};
+pub use cameraunit::{
+    CameraInfo, CameraUnit, DynamicSerialImage, Error, ImageMetaData, OptimumExposureConfig,
+    SerialImageBuffer, ROI,
+};
 
-pub use flicamera::{num_cameras, get_camera_ids, open_camera, open_first_camera};
+pub use flicamera::{
+    get_camera_ids, num_cameras, open_camera, open_first_camera, CameraInfoFLI, CameraUnitFLI,
+};
 
 #[cfg(test)]
 mod tests {

@@ -1250,6 +1250,7 @@ static long fli_homedevice(flidev_t dev, long block)
 	else /* New HW */
 	{
 		clock_t begin;
+		FLI_UNUSED(begin);
 		unsigned short stepsleft;
 
 		rlen = 2; wlen = 2;

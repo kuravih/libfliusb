@@ -52,6 +52,7 @@
 
 long fli_raw_open(flidev_t dev)
 {
+  FLI_UNUSED(dev);
 	return 0;
 }
 
@@ -80,5 +81,8 @@ long fli_raw_close(flidev_t dev)
 
 long fli_raw_command(flidev_t dev, int cmd, int argc, ...)
 {
+  FLI_UNUSED(dev);
+  FLI_UNUSED(cmd);
+  FLI_UNUSED(argc);
 	return -EINVAL;		
 }

@@ -275,6 +275,7 @@ int xasprintf(char **strp, const char *fmt, ...)
   va_list ap;
   char *tmp;
   int err;
+  FLI_UNUSED(strp);
 
   va_start(ap, fmt);
 

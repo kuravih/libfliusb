@@ -3,8 +3,6 @@ extern crate cc;
 
 use std::{env, path::PathBuf};
 
-use bindgen::CargoCallbacks;
-
 #[cfg(target_os="windows")]
 fn main() {
     panic!("This crate does not support Windows");
@@ -90,7 +88,7 @@ fn main() {
         .header(headers_path_str)
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
-        .parse_callbacks(Box::new(CargoCallbacks::new()))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

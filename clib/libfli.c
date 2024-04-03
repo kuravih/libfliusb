@@ -238,7 +238,7 @@ LIBFLIAPI FLIGrabFrame(flidev_t dev, void* buff,
       return res;
   }
 
-  if (buffsize < width * height * 2)
+  if ((long) buffsize < width * height * 2)
   {
     printf("FLIGrabFrame: buffer too small: expected %ld, got %lu\n", width * height * 2, buffsize);
       return -ENOMEM;

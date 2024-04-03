@@ -334,6 +334,7 @@ long libusb_bulkread(flidev_t dev, void *buf, long *rlen)
 long libusb_usb_disconnect(flidev_t dev,  fli_unixio_t *io)
 {
   long err = 0;
+  FLI_UNUSED(dev);
 	
   debug(FLIDEBUG_INFO, "Disconnecting");
 
@@ -387,6 +388,7 @@ int libusb_fli_create_name(libusb_device *usb_dev, char *name, size_t max_name)
   char name_prefix[] = "FLI-";
   char *p, *s;
   int port;
+  FLI_UNUSED(addr);
 
   if (name == NULL)
   {
@@ -465,6 +467,7 @@ int libusb_fli_create_name(libusb_device *usb_dev, char *name, size_t max_name)
 
 long libusb_list(char *pattern, flidomain_t domain, char ***names)
 {
+  FLI_UNUSED(pattern);
   int r, i;
   char **list;
   libusb_device **usb_devs;
@@ -631,6 +634,7 @@ long libusb_list(char *pattern, flidomain_t domain, char ***names)
 
 libusb_device_handle * libusb_fli_find_handle(struct libusb_context *usb_ctx, char *name)
 {
+  FLI_UNUSED(usb_ctx);
   int r, i;
   libusb_device **usb_devs;
   libusb_device *usb_dev;

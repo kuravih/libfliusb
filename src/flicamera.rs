@@ -5,18 +5,18 @@ use std::{
     str,
     sync::{atomic::Ordering, Arc},
     thread::sleep,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime},
 };
 
 use crate::fli_ffi::*;
 
-use cameraunit::{
-    CameraInfo, CameraUnit, DynamicSerialImage, Error, ImageMetaData, SerialImageBuffer, ROI,
-};
+use cameraunit::{CameraInfo, CameraUnit, DynamicSerialImage, Error, ImageMetaData, ROI};
 use log::warn;
 
 use crate::flihandle::*;
-
+/// This object describes a FLI camera, and provides methods for control and image capture.
+///
+/// This object implements the [`cameraunit::CameraUnit`] and [`cameraunit::CameraInfo`] trait.
 pub struct CameraUnitFLI {
     handle: Arc<FLIHandle>,
     info: CameraInfoFLI,
@@ -28,6 +28,9 @@ pub struct CameraUnitFLI {
 }
 
 #[derive(Debug, Clone)]
+/// This object describes a FLI camera and provides methods for obtaining housekeeping data.
+///
+/// This object implements the [`cameraunit::CameraInfo`] trait, and additionally the [`std::clone::Clone`] trait.
 pub struct CameraInfoFLI {
     handle: Arc<FLIHandle>,
     /// CCD width in pixels.
@@ -51,7 +54,16 @@ impl Drop for FLIHandle {
     }
 }
 
-/// Get a list of camera IDs.
+/// Get the IDs and names of the available ZWO ASI cameras.
+///
+/// # Examples
+///
+/// ```
+/// let cam_ids = cameraunit_fli::get_camera_ids();
+/// if let Ok(cam_ids) = cam_ids {
+///     // do stuff with camera IDs and names
+/// }
+/// ```
 pub fn get_camera_ids() -> Result<Vec<String>, Error> {
     let mut ptr: *mut *mut i8 = std::ptr::null_mut();
     FLICALL!(FLIList(FLIDOMAIN_CAMERA, &mut ptr));
@@ -79,7 +91,17 @@ pub fn get_camera_ids() -> Result<Vec<String>, Error> {
     Ok(out)
 }
 
-/// Get the number of cameras connected to the system.
+/// Get the number of available ZWO ASI cameras.
+///
+/// # Examples
+///
+/// ```
+/// let num_cameras = cameraunit_fli::num_cameras();
+/// if num_cameras <= 0 {
+///     println!("No cameras found");
+/// }
+/// // proceed to get camera IDs and information
+/// ```
 pub fn num_cameras() -> i32 {
     let camlist = get_camera_ids();
     match camlist {
@@ -88,8 +110,38 @@ pub fn num_cameras() -> i32 {
     }
 }
 
-/// Open a camera by name.
-pub fn open_camera(name: &str) -> Result<CameraUnitFLI, Error> {
+/// Open a ZWO ASI camera by ID for access.
+///
+/// This method, if successful, returns a tuple containing a `CameraUnit_FLI` object and a `CameraInfo_FLI` object.
+/// The `CameraUnit_FLI` object allows for control of the camera and image capture, while the `CameraInfo_FLI` object
+/// only allows for access to housekeeping data.
+///
+/// The `CameraUnit_FLI` object is required for image capture, and should
+/// be mutable in order to set exposure, ROI, gain, etc.
+///
+/// The `CameraInfo_FLI` object allows cloning and sharing, and is useful for obtaining housekeeping data from separate
+/// threads.
+///
+/// # Arguments
+///
+/// * `id` - The ID of the camera to open. This ID can be obtained from the `get_camera_ids()` method.
+///
+/// # Errors
+///  - [`cameraunit::Error::InvalidFormat`] - The ID provided is not valid.
+///  - [`cameraunit::Error::GeneralError`] - Could not open camera (error code).
+///  - [`cameraunit::Error::NoCamerasAvailable`] - No cameras are available.
+///
+/// # Examples
+///
+/// ```
+/// use cameraunit_fli::open_camera;
+/// let id = "FLI-04"; // some ID obtained using get_camera_ids()
+/// if let Ok((mut cam, caminfo)) = open_camera(id) {
+///
+/// }
+/// // do things with cam
+/// ```
+pub fn open_camera(name: &str) -> Result<(CameraUnitFLI, CameraInfoFLI), Error> {
     let mut handle: flidev_t = FLI_INVALID_DEVICE.into();
     let cname: Vec<&str> = name.split(';').collect();
     let cname = CString::new(cname[0])
@@ -118,26 +170,54 @@ pub fn open_camera(name: &str) -> Result<CameraUnitFLI, Error> {
         serial,
     };
 
-    Ok(CameraUnitFLI {
-        handle,
-        info,
-        x_min,
-        y_min,
-        x_max,
-        y_max,
-        roi: ROI {
-            x_min: 0,
-            y_min: 0,
-            width: (x_max - x_min) as u32,
-            height: (y_max - y_min) as u32,
-            bin_x: 1,
-            bin_y: 1,
+    Ok((
+        CameraUnitFLI {
+            handle,
+            info: info.clone(),
+            x_min,
+            y_min,
+            x_max,
+            y_max,
+            roi: ROI {
+                x_min: 0,
+                y_min: 0,
+                width: (x_max - x_min) as u32,
+                height: (y_max - y_min) as u32,
+                bin_x: 1,
+                bin_y: 1,
+            },
         },
-    })
+        info,
+    ))
 }
 
-/// Open the first available camera.
-pub fn open_first_camera() -> Result<CameraUnitFLI, Error> {
+/// Open the first available ZWO ASI camera for access.
+///
+/// This method, if successful, returns a tuple containing a `CameraUnit_FLI` object and a `CameraInfo_FLI` object.
+/// The `CameraUnit_FLI` object allows for control of the camera and image capture, while the `CameraInfo_FLI` object
+/// only allows for access to housekeeping data.
+///
+/// The `CameraUnit_FLI` object is required for image capture, and should
+/// be mutable in order to set exposure, ROI, gain, etc.
+///
+/// The `CameraInfo_FLI` object allows cloning and sharing, and is useful for obtaining housekeeping data from separate
+/// threads.
+///
+/// # Errors
+///  - [`cameraunit::Error::InvalidFormat`] - The ID provided is not valid.
+///  - [`cameraunit::Error::GeneralError`] - Could not open camera (error code).
+///  - [`cameraunit::Error::NoCamerasAvailable`] - No cameras are available.
+///
+/// # Examples
+///
+/// ```
+/// use cameraunit_fli::open_first_camera;
+///
+/// if let Ok((mut cam, caminfo)) = open_first_camera() {
+///
+/// }
+/// ```
+pub fn open_first_camera() -> Result<(CameraUnitFLI, CameraInfoFLI), Error> {
     let camlist = get_camera_ids()?;
     if camlist.is_empty() {
         return Err(Error::NoCamerasAvailable);
@@ -298,7 +378,12 @@ impl CameraUnit for CameraUnitFLI {
     }
 
     fn capture_image(&self) -> Result<DynamicSerialImage, Error> {
-        todo!()
+        self.start_exposure()?;
+        sleep(self.get_exposure());
+        while !self.image_ready()? {
+            sleep(Duration::from_millis(10));
+        }
+        self.download_image()
     }
 
     fn start_exposure(&self) -> Result<(), Error> {
@@ -429,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_get_temperature() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         let temp = cam.handle.get_temperature().unwrap();
         println!("Temperature: {}", temp);
         assert!(temp >= -100.);
@@ -437,13 +522,13 @@ mod tests {
 
     #[test]
     fn test_set_temperature() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         cam.handle.set_temperature(-20.).unwrap();
     }
 
     #[test]
     fn test_get_cooler_power() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         let power = cam.handle.get_cooler_power().unwrap();
         println!("Cooler power: {}", power);
         assert!(power >= 0.);
@@ -451,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_get_model() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         let model = cam.handle.get_model().unwrap();
         println!("Model: {}", model);
         assert!(!model.is_empty());
@@ -459,13 +544,13 @@ mod tests {
 
     #[test]
     fn test_set_exposure() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         cam.handle.set_exposure(Duration::from_millis(100)).unwrap();
     }
 
     #[test]
     fn test_get_array_size() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         let size = cam.handle.get_array_size().unwrap();
         println!("Array size: {:?}", size);
         assert!(size.0 > 0 && size.1 > 0);
@@ -473,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_set_visible_area() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         println!("{:?}", cam.handle.get_array_size().unwrap());
         let roi = ROI {
             x_min: 100,
@@ -493,7 +578,7 @@ mod tests {
 
     #[test]
     fn test_get_serial() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         let serial = cam.handle.get_serial().unwrap();
         println!("Serial: {}", serial);
         assert!(!serial.is_empty());
@@ -501,14 +586,14 @@ mod tests {
 
     #[test]
     fn test_get_camera_mode() {
-        let cam = open_first_camera().unwrap();
+        let (cam, _) = open_first_camera().unwrap();
         let mode = cam.handle.list_camera_modes();
         println!("Camera modes: {:?}", mode);
     }
 
     #[test]
     fn test_get_exposure_status() {
-        let mut cam = open_first_camera().unwrap();
+        let (mut cam, _) = open_first_camera().unwrap();
         println!("{}", cam.get_roi());
         let mut timeleft: c_long = 0;
         let res = unsafe { FLIGetExposureStatus(cam.handle.dev, &mut timeleft) };
@@ -524,7 +609,8 @@ mod tests {
             height: 500,
             bin_x: 2,
             bin_y: 2,
-        }).unwrap();
+        })
+        .unwrap();
         cam.start_exposure().unwrap();
         let res = unsafe { FLIGetExposureStatus(cam.handle.dev, &mut timeleft) };
         println!("Exposure status: {}, time left: {}", res, timeleft);
