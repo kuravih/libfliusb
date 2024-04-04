@@ -286,7 +286,7 @@ impl CameraInfo for CameraUnitFLI {
     }
 
     fn get_ccd_width(&self) -> u32 {
-        self.info.height
+        self.info.width
     }
 
     fn get_ccd_height(&self) -> u32 {
@@ -497,7 +497,7 @@ impl CameraUnit for CameraUnitFLI {
 
             self.roi = self.handle.get_readout_dim()?;
             self.roi.x_min = (self.roi.x_min - self.x_min as u32) / self.roi.bin_x;
-            self.roi.y_min -= (self.roi.y_min - self.y_min as u32) / self.roi.bin_y;
+            self.roi.y_min = (self.roi.y_min - self.y_min as u32) / self.roi.bin_y;
             Ok(&self.roi)
         }
     }
@@ -528,6 +528,9 @@ impl CameraUnitFLI {
             self.y_max.into()
         ));
         self.roi = self.handle.get_readout_dim()?;
+        self.roi.x_min = 0;
+        self.roi.y_min = 0;
+
         Ok(&self.roi)
     }
 }

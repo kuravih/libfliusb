@@ -40,7 +40,6 @@ pub struct FLIHandle {
     pub bpp: AtomicU32,
 }
 
-
 impl Drop for FLIHandle {
     fn drop(&mut self) {
         let handle = self.dev;
@@ -256,7 +255,8 @@ impl FLIHandle {
         let mut modes = [0i8; 128];
         let mut mode_list = Vec::new();
         for i in 0..128 {
-            let res = unsafe { FLIGetCameraModeString(self.dev, i, modes.as_mut_ptr(), modes.len()) };
+            let res =
+                unsafe { FLIGetCameraModeString(self.dev, i, modes.as_mut_ptr(), modes.len()) };
             if res != 0 {
                 break;
             }
@@ -282,7 +282,12 @@ impl FLIHandle {
         match bpp {
             PixelBpp::Bpp8 => FLICALL!(FLISetBitDepth(self.dev, FLI_MODE_8BIT as c_long)),
             PixelBpp::Bpp16 => FLICALL!(FLISetBitDepth(self.dev, FLI_MODE_16BIT as c_long)),
-            _ => return Err(Error::InvalidValue(format!("Invalid bit depth value {:?}", bpp))),
+            _ => {
+                return Err(Error::InvalidValue(format!(
+                    "Invalid bit depth value {:?}",
+                    bpp
+                )))
+            }
         }
         self.bpp.store(bpp as u32, Ordering::SeqCst);
         Ok(())
