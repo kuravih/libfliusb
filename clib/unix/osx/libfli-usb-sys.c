@@ -51,6 +51,7 @@
 long mac_fli_list(flidomain_t domain, char ***names)
 {
 	char **list = NULL;
+    FLI_UNUSED(domain);
     if((list = malloc((MAX_SEARCH + 1) * sizeof(char *))) == NULL)
     {
         return -ENOMEM;
@@ -280,11 +281,13 @@ long mac_fli_connect(flidev_t dev, char *name, long domain)
 // Disconnect device
 //
 //==========================================================================
-long mac_fli_disconnect(flidev_t dev, fli_unixio_t *io)
+long mac_fli_disconnect(flidev_t dev)
 {
     int err = 0;
     
     CHKDEVICE(dev);
+
+    fli_unixio_t *io;
     
     if((io = DEVICE->io_data) == NULL)
     {
@@ -341,7 +344,7 @@ long mac_fli_disconnect(flidev_t dev, fli_unixio_t *io)
 long mac_usb_connect(flidev_t dev, fli_unixio_t *io, char *name)
 {
     bool found = false;
-    
+    FLI_UNUSED(io);
 	kern_return_t kret;
 	IOReturn ioret;
     
@@ -643,7 +646,7 @@ IOReturn mac_usb_find_interfaces(flidev_t dev, IOUSBDeviceInterface182 **device)
             DEVICE_DATA->epWrite = 3;
             DEVICE_DATA->epReadBulk = 2;
         }
-        else if(DEVICE->devinfo.devid == FLIUSB_FILTERWHEEL || FLIUSB_FOCUSER || FLIUSB_STEPPER)
+        else if((DEVICE->devinfo.devid == FLIUSB_FILTERWHEEL) || (DEVICE->devinfo.devid == FLIUSB_FOCUSER) | (DEVICE->devinfo.devid == FLIUSB_STEPPER))
         {
             DEVICE_DATA->epRead = 1;
             DEVICE_DATA->epWrite = 2;
@@ -740,7 +743,7 @@ IOReturn mac_usb_find_interfaces(flidev_t dev, IOUSBDeviceInterface182 **device)
 long mac_usb_disconnect(flidev_t dev, fli_unixio_t *io)
 {
     debug(FLIDEBUG_INFO, "mac_usb_disconnect");
-          
+    FLI_UNUSED(io);
     (*DEVICE_DATA->interface)->USBInterfaceClose(DEVICE_DATA->interface);
     (*DEVICE_DATA->interface)->Release(DEVICE_DATA->interface);
     
@@ -845,7 +848,7 @@ ssize_t mac_usb_piperead(flidev_t dev, void *buf, size_t size, unsigned pipe, un
 ssize_t mac_usb_pipewrite(flidev_t dev, void *buf, size_t size, unsigned pipe, unsigned timeout)
 {
     CHKDEVICE(dev);
-    
+    FLI_UNUSED(pipe);
 	IOReturn ioret;    
     
 	int piperef = DEVICE_DATA->epWrite;
@@ -914,3 +917,24 @@ long mac_fli_unlock(flidev_t dev)
     return 0;
 }
 //-------------------------------------------------------------------------
+
+//==========================================================================
+// MAC_FLI_TRYLOCK
+// Function to try to lock access to device
+//
+//==========================================================================
+long mac_fli_trylock(flidev_t dev)
+{
+    fli_unixio_t *io = DEVICE->io_data;
+    if(io == NULL)
+    {
+        return -ENODEV;
+    }
+    
+    if(!flock(io->fd, LOCK_EX | LOCK_NB))
+    {
+        return -errno;
+    }
+    
+    return 0;
+}

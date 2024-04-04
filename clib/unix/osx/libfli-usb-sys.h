@@ -74,6 +74,10 @@
 #include "libfli-filter-focuser.h"
 //-------------------------------------------------------------------------
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Structure to describe string descriptor transfers */
 typedef struct {
     unsigned int index;
@@ -156,9 +160,12 @@ typedef struct _mac_device_info
 #define DEVICE_DATA ((mac_device_info*)DEVICE->sys_data)
 
 long mac_fli_list(flidomain_t domain, char ***names);
-
 long mac_fli_connect(flidev_t dev, char *name, long domain);
-long mac_fli_disconnect(flidev_t dev, fli_unixio_t *io);
+long mac_fli_disconnect(flidev_t dev);
+long mac_fli_lock(flidev_t dev);
+long mac_fli_unlock(flidev_t dev);
+long mac_fli_trylock(flidev_t dev);
+
 
 long mac_usb_connect(flidev_t dev, fli_unixio_t *io, char *name);
 IOReturn mac_usb_configure_device(IOUSBDeviceInterface182 **dev);
@@ -174,6 +181,7 @@ long mac_bulkwrite(flidev_t dev, void *buf, long *wlen);
 ssize_t mac_usb_piperead(flidev_t dev, void *buf,size_t size, unsigned pipe, unsigned timeout);
 ssize_t mac_usb_pipewrite(flidev_t dev, void *buf, size_t size, unsigned pipe, unsigned timeout);
 
-long mac_fli_lock(flidev_t dev);
-long mac_fli_unlock(flidev_t dev);
 
+#ifdef __cplusplus
+}
+#endif

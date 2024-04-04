@@ -53,6 +53,32 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+typedef struct {
+  int fd;
+  void *han;
+} fli_unixio_t;
+
+typedef struct {
+  pthread_mutex_t mutex;
+  pthread_mutexattr_t attr;
+  long locked;
+  long OS;
+} fli_unixsysinfo_t;
+
+long unix_fli_connect(flidev_t dev, char *name, long domain);
+long unix_fli_disconnect(flidev_t dev);
+long unix_fli_lock(flidev_t dev);
+long unix_fli_unlock(flidev_t dev);
+long unix_fli_trylock(flidev_t dev);
+long unix_fli_list(flidomain_t domain, char ***names);
+
+long mac_fli_list(flidomain_t domain, char ***names);
+long mac_fli_connect(flidev_t dev, char *name, long domain);
+long mac_fli_disconnect(flidev_t dev);
+long mac_fli_lock(flidev_t dev);
+long mac_fli_unlock(flidev_t dev);
+long mac_fli_trylock(flidev_t dev);
+
 #if defined(__linux__)
 
 #define __SYSNAME__ "Linux"
@@ -117,24 +143,5 @@
 #else
 #error "Unknown system"
 #endif
-
-typedef struct {
-  int fd;
-  void *han;
-} fli_unixio_t;
-
-typedef struct {
-  pthread_mutex_t mutex;
-  pthread_mutexattr_t attr;
-  long locked;
-  long OS;
-} fli_unixsysinfo_t;
-
-long unix_fli_connect(flidev_t dev, char *name, long domain);
-long unix_fli_disconnect(flidev_t dev);
-long unix_fli_lock(flidev_t dev);
-long unix_fli_unlock(flidev_t dev);
-long unix_fli_trylock(flidev_t dev);
-long unix_fli_list(flidomain_t domain, char ***names);
 
 #endif /* _LIBFLI_SYS_H */

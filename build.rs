@@ -3,12 +3,12 @@ extern crate cc;
 
 use std::{env, path::PathBuf};
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 fn main() {
     panic!("This crate does not support Windows");
 }
 
-#[cfg(not(target_os="windows"))]
+#[cfg(not(target_os = "windows"))]
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     // Compile the C library
@@ -43,14 +43,17 @@ fn main() {
     builder
         .opt_level(3)
         .flag("-pthread")
-        .flag("-D__LIBUSB__")
         .files(files)
         .include("clib")
         .include("clib/unix")
-        .include("clib/unix/osx")
         .out_dir(&out_path);
+    #[cfg(target_os = "linux")]
+    {
+        builder.flag("-D__LIBUSB__");
+    }
     #[cfg(target_os = "macos")]
     {
+        builder.flag("-D__APPLE__");
         builder.include("clib/unix/osx");
     }
     builder.compile("libfli-usb.a");
@@ -72,7 +75,6 @@ fn main() {
     // automatically know it must look for a `libhello.a` file.
     println!("cargo:rustc-link-lib=fli-usb");
     println!("cargo:rustc-link-lib=pthread");
-    println!("cargo:rustc-link-lib=rt");
     println!("cargo:rustc-link-lib=m");
     #[cfg(target_os = "linux")]
     println!("cargo:rustc-link-lib=usb-1.0");
