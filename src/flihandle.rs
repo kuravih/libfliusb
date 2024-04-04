@@ -2,6 +2,7 @@
 use std::{
     ffi::{c_long, CStr},
     sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+    thread::sleep,
     time::Duration,
 };
 
@@ -47,9 +48,11 @@ impl Drop for FLIHandle {
         if res != 0 {
             warn!("Error cancelling exposure: {}", res);
         }
+        sleep(Duration::from_millis(100));
         if self.set_temperature(35.0).is_err() {
             warn!("Error setting temperature: {}", res);
         }
+        sleep(Duration::from_millis(100));
         unsafe { FLIClose(self.dev) };
     }
 }
