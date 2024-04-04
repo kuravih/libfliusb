@@ -40,6 +40,21 @@ pub struct FLIHandle {
     pub bpp: AtomicU32,
 }
 
+
+impl Drop for FLIHandle {
+    fn drop(&mut self) {
+        let handle = self.dev;
+        let res = unsafe { FLICancelExposure(handle) };
+        if res != 0 {
+            warn!("Error cancelling exposure: {}", res);
+        }
+        if self.set_temperature(35.0).is_err() {
+            warn!("Error setting temperature: {}", res);
+        }
+        unsafe { FLIClose(self.dev) };
+    }
+}
+
 impl FLIHandle {
     pub fn new(handle: flidev_t) -> Self {
         FLIHandle {

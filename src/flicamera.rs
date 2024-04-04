@@ -43,17 +43,6 @@ pub struct CameraInfoFLI {
     serial: String,
 }
 
-impl Drop for FLIHandle {
-    fn drop(&mut self) {
-        let handle = self.dev;
-        let res = unsafe { FLICancelExposure(handle) };
-        if res != 0 {
-            warn!("Error cancelling exposure: {}", res);
-        }
-        unsafe { FLIClose(self.dev) };
-    }
-}
-
 /// Get the IDs and names of the available ZWO ASI cameras.
 ///
 /// # Examples
@@ -512,12 +501,12 @@ impl CameraUnit for CameraUnitFLI {
     fn get_roi(&self) -> &ROI {
         &self.roi
     }
-    
+
     fn set_bpp(&mut self, bpp: PixelBpp) -> Result<PixelBpp, Error> {
         self.handle.set_bpp(bpp)?;
         Ok(bpp)
     }
-    
+
     fn get_bpp(&self) -> cameraunit::PixelBpp {
         self.handle.get_bpp()
     }
@@ -537,7 +526,6 @@ impl CameraUnitFLI {
         self.roi = self.handle.get_readout_dim()?;
         Ok(&self.roi)
     }
-
 }
 
 #[cfg(test)]
