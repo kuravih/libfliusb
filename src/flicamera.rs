@@ -496,6 +496,8 @@ impl CameraUnit for CameraUnitFLI {
             self.handle.set_vbin(roi.bin_y)?;
 
             self.roi = self.handle.get_readout_dim()?;
+            self.roi.x_min = (self.roi.x_min - self.x_min as u32) / self.roi.bin_x;
+            self.roi.y_min -= (self.roi.y_min - self.y_min as u32) / self.roi.bin_y;
             Ok(&self.roi)
         }
     }
