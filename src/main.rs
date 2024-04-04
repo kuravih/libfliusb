@@ -99,7 +99,7 @@ fn main() {
     .unwrap();
     cam.set_exposure(Duration::from_millis(100)).unwrap();
     let exp_ctrl = OptimumExposureBuilder::default()
-        .percentile_pix(cfg.percentile as f32)
+        .percentile_pix((cfg.percentile * 0.01) as f32)
         .pixel_tgt(cfg.target_val as f32)
         .pixel_uncertainty(cfg.target_uncertainty as f32)
         .max_allowed_bin(cfg.max_bin as u16)

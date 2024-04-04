@@ -34,6 +34,12 @@ int main()
             printf("FLISetExposureTime failed with error code %d\n", res);
             goto close;
         }
+        res = FLISetBitDepth(dev, FLI_MODE_16BIT);
+        if (res < 0)
+        {
+            printf("FLISetBitDepth failed with error code %d\n", res);
+            goto close;
+        }
         res = FLISetFrameType(dev, FLI_FRAME_TYPE_NORMAL);
         if (res < 0)
         {

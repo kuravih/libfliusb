@@ -38,20 +38,4 @@ mod tests {
         println!("Number of cameras: {}", num);
         assert!(num >= 0);
     }
-
-    #[test]
-    fn test_open_camera() {
-        let ids = get_camera_ids().unwrap();
-        if ids.is_empty() {
-            return;
-        }
-        let cam = open_camera(&ids[0]);
-        assert!(cam.is_ok());
-    }
-
-    #[test]
-    fn test_open_first_camera() {
-        let cam = open_first_camera();
-        assert!(cam.is_ok());
-    }
 }

@@ -279,8 +279,11 @@ impl FLIHandle {
     }
 
     pub fn set_bpp(&self, bpp: PixelBpp) -> Result<(), Error> {
-        let bpp = bpp as c_long;
-        FLICALL!(FLISetBitDepth(self.dev, bpp as c_long));
+        match bpp {
+            PixelBpp::Bpp8 => FLICALL!(FLISetBitDepth(self.dev, FLI_MODE_8BIT as c_long)),
+            PixelBpp::Bpp16 => FLICALL!(FLISetBitDepth(self.dev, FLI_MODE_16BIT as c_long)),
+            _ => return Err(Error::InvalidValue(format!("Invalid bit depth value {:?}", bpp))),
+        }
         self.bpp.store(bpp as u32, Ordering::SeqCst);
         Ok(())
     }
