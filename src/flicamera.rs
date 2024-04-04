@@ -10,7 +10,7 @@ use std::{
 
 use crate::fli_ffi::*;
 
-use cameraunit::{CameraInfo, CameraUnit, DynamicSerialImage, Error, ImageMetaData, ROI};
+use cameraunit::{CameraInfo, CameraUnit, DynamicSerialImage, Error, ImageMetaData, PixelBpp, ROI};
 use log::warn;
 
 use crate::flihandle::*;
@@ -160,6 +160,10 @@ pub fn open_camera(name: &str) -> Result<(CameraUnitFLI, CameraInfoFLI), Error> 
     }
     let handle = Arc::new(FLIHandle::new(handle));
     let serial = handle.get_serial()?;
+    if handle.set_bpp(PixelBpp::Bpp16).is_err() {
+        warn!("Error setting pixel bit depth to 16 bits, attempting 8 bits");
+        handle.set_bpp(PixelBpp::Bpp8)?;
+    }
     let (x_min, y_min, x_max, y_max) = handle.get_array_size()?;
 
     let info = CameraInfoFLI {
@@ -467,7 +471,10 @@ impl CameraUnit for CameraUnitFLI {
         if self.info.is_capturing() {
             Err(Error::ExposureInProgress)
         } else {
-            if roi.width == 0 || roi.height == 0 {
+            if roi.width == 0 && roi.height == 0 && roi.x_min == 0 && roi.y_min == 0 {
+                return self.roi_reset();
+            }
+            if (roi.width == 0 || roi.height == 0) && (roi.x_min != 0 || roi.y_min != 0) {
                 return Err(Error::InvalidValue("Invalid ROI".to_string()));
             }
 
@@ -505,6 +512,32 @@ impl CameraUnit for CameraUnitFLI {
     fn get_roi(&self) -> &ROI {
         &self.roi
     }
+    
+    fn set_bpp(&mut self, bpp: PixelBpp) -> Result<PixelBpp, Error> {
+        self.handle.set_bpp(bpp)?;
+        Ok(bpp)
+    }
+    
+    fn get_bpp(&self) -> cameraunit::PixelBpp {
+        self.handle.get_bpp()
+    }
+}
+
+impl CameraUnitFLI {
+    fn roi_reset(&mut self) -> Result<&ROI, Error> {
+        self.handle.set_hbin(1)?;
+        self.handle.set_vbin(1)?;
+        FLICALL!(FLISetImageArea(
+            self.handle.dev,
+            self.x_min.into(),
+            self.y_min.into(),
+            self.x_max.into(),
+            self.y_max.into()
+        ));
+        self.roi = self.handle.get_readout_dim()?;
+        Ok(&self.roi)
+    }
+
 }
 
 #[cfg(test)]

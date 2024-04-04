@@ -1,13 +1,14 @@
 #![allow(unused)]
 use std::{
     ffi::{c_long, CStr},
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     time::Duration,
 };
 
 use crate::fli_ffi::*;
-use cameraunit::{Error, ROI};
+use cameraunit::{Error, PixelBpp, ROI};
 
+use image::Pixel;
 use log::warn;
 
 macro_rules! FLICALL {
@@ -35,6 +36,8 @@ pub struct FLIHandle {
     pub ready: AtomicBool,
     /// dark
     pub dark: AtomicBool,
+    /// The pixel bit depth.
+    pub bpp: AtomicU32,
 }
 
 impl FLIHandle {
@@ -45,6 +48,7 @@ impl FLIHandle {
             capturing: AtomicBool::new(false),
             ready: AtomicBool::new(false),
             dark: AtomicBool::new(false),
+            bpp: AtomicU32::new(16),
         }
     }
 
@@ -257,5 +261,16 @@ impl FLIHandle {
         let mut y: f64 = 0.;
         FLICALL!(FLIGetPixelSize(self.dev, &mut x, &mut y));
         Ok((x, y))
+    }
+
+    pub fn set_bpp(&self, bpp: PixelBpp) -> Result<(), Error> {
+        let bpp = bpp as c_long;
+        FLICALL!(FLISetBitDepth(self.dev, bpp as c_long));
+        self.bpp.store(bpp as u32, Ordering::SeqCst);
+        Ok(())
+    }
+
+    pub fn get_bpp(&self) -> PixelBpp {
+        self.bpp.load(Ordering::SeqCst).into()
     }
 }

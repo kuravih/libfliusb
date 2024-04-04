@@ -11,8 +11,8 @@ use std::{
 };
 
 use cameraunit_fli::{
-    num_cameras, open_first_camera, CameraInfo, CameraUnit, DynamicSerialImage,
-    Error, OptimumExposureConfig, ROI,
+    num_cameras, open_first_camera, CameraInfo, CameraUnit, DynamicSerialImage, Error,
+    OptimumExposureBuilder, ROI,
 };
 use chrono::{DateTime, Local};
 use configparser::ini::Ini;
@@ -98,16 +98,14 @@ fn main() {
     })
     .unwrap();
     cam.set_exposure(Duration::from_millis(100)).unwrap();
-    let exp_ctrl = OptimumExposureConfig::new(
-        (cfg.percentile * 0.01) as f32,
-        cfg.target_val as f32,
-        cfg.target_uncertainty as f32,
-        100,
-        cam.get_min_exposure().unwrap_or(Duration::from_millis(1)),
-        cfg.max_exposure,
-        cfg.max_bin as u16,
-    )
-    .unwrap();
+    let exp_ctrl = OptimumExposureBuilder::default()
+        .percentile_pix(cfg.percentile as f32)
+        .pixel_tgt(cfg.target_val as f32)
+        .pixel_uncertainty(cfg.target_uncertainty as f32)
+        .max_allowed_bin(cfg.max_bin as u16)
+        .max_allowed_exp(cfg.max_exposure)
+        .build()
+        .unwrap();
     'main_loop: while !done.load(Ordering::SeqCst) {
         let mut img: DynamicSerialImage;
         let exp_start: DateTime<Local> = SystemTime::now().into();
@@ -152,8 +150,7 @@ fn main() {
         if !dir_prefix.exists() {
             std::fs::create_dir_all(&dir_prefix).unwrap();
         }
-        let res = img
-            .savefits(&dir_prefix, "comic", Some(&cfg.progname), true, true);
+        let res = img.savefits(&dir_prefix, "comic", Some(&cfg.progname), true, true);
         if let Err(res) = res {
             let res = match res {
                 fitsio::errors::Error::ExistingFile(res) => res,
@@ -181,7 +178,7 @@ fn main() {
             );
         }
         let (exposure, _bin) = exp_ctrl
-            .find_optimum_exposure(
+            .calculate(
                 img.into_luma().into_vec(),
                 img.get_metadata().unwrap().exposure,
                 img.get_metadata().unwrap().bin_x as u8,

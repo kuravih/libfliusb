@@ -12,8 +12,8 @@ mod flicamera;
 
 /// Re-export of [`cameraunit`] crate.
 pub use cameraunit::{
-    CameraInfo, CameraUnit, DynamicSerialImage, Error, ImageMetaData, OptimumExposureConfig,
-    SerialImageBuffer, ROI,
+    CameraInfo, CameraUnit, DynamicSerialImage, Error, ImageMetaData, OptimumExposure,
+    OptimumExposureBuilder, SerialImageBuffer, ROI,
 };
 
 pub use flicamera::{

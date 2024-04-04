@@ -108,9 +108,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "cameraunit"
-version = "4.0.0"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9850008d866a1c9bce719a8e043a337acac0f2c4cad231c6bfd63f56aad3dc59"
+checksum = "cdfbc7c58c6de458d6203635b5e807421558e128496b39e4b6c5cbc8aeb8b6c4"
 dependencies = [
  "fitsio",
  "image",
@@ -734,10 +734,11 @@ dependencies = [
 
 [[package]]
 name = "serialimage"
-version = "3.0.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c50bce3ba514e4d0c1f824a4c1958cde5a3d52fabb93b06377ae710caa05a6c"
+checksum = "7847acfd6233eef9a2acc9a0a88ac945fa55ceded41733f8dd7369c22daaa640"
 dependencies = [
+ "chrono",
  "fitsio",
  "image",
  "once_cell",
