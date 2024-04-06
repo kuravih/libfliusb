@@ -255,7 +255,7 @@ impl FLIHandle {
     }
 
     pub fn list_camera_modes(&self) -> Vec<String> {
-        let mut modes = [0i8; 128];
+        let mut modes = [0; 128];
         let mut mode_list = Vec::new();
         for i in 0..128 {
             let res =

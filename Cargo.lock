@@ -122,7 +122,7 @@ dependencies = [
 
 [[package]]
 name = "cameraunit_fli"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "bindgen",
  "cameraunit",
