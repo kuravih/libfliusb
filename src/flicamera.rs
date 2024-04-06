@@ -54,7 +54,7 @@ pub struct CameraInfoFLI {
 /// }
 /// ```
 pub fn get_camera_ids() -> Result<Vec<String>, Error> {
-    let mut ptr: *mut *mut i8 = std::ptr::null_mut();
+    let mut ptr = std::ptr::null_mut();
     FLICALL!(FLIList(FLIDOMAIN_CAMERA, &mut ptr));
     let mut i = 0;
     let mut out = Vec::new();

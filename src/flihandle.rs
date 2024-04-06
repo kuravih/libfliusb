@@ -146,7 +146,7 @@ impl FLIHandle {
     }
 
     pub fn get_model(&self) -> Result<String, Error> {
-        let mut model = [0i8; 128];
+        let mut model = [0; 128];
         FLICALL!(FLIGetModel(self.dev, model.as_mut_ptr(), model.len()));
         let model = unsafe { CStr::from_ptr(model.as_ptr()) };
         Ok(model.to_string_lossy().to_string())
@@ -230,7 +230,7 @@ impl FLIHandle {
     }
 
     pub fn get_serial(&self) -> Result<String, Error> {
-        let mut serial = [0i8; 128];
+        let mut serial = [0; 128];
         FLICALL!(FLIGetSerialString(
             self.dev,
             serial.as_mut_ptr(),
@@ -241,7 +241,7 @@ impl FLIHandle {
     }
 
     pub fn get_camera_mode(&self) -> Result<(c_long, String), Error> {
-        let mut mode = [0i8; 128];
+        let mut mode = [0; 128];
         let mut modec: flimode_t = 0;
         FLICALL!(FLIGetCameraMode(self.dev, &mut modec));
         FLICALL!(FLIGetCameraModeString(
