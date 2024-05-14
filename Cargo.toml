@@ -1,6 +1,6 @@
 [package]
 name = "cameraunit_fli"
-version = "0.0.6"
+version = "0.0.7"
 edition = "2021"
 rust-version = "1.68.0"
 authors = ["Sunip K. Mukherjee"]
@@ -24,13 +24,13 @@ bench = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cameraunit = "5.0"
-chrono = "0.4.31"
-configparser = "3.0.2"
-ctrlc = "3.4.1"
-fitsio = "0.21.2"
-image = "0.24.7"
-log = "0.4.20"
+cameraunit = "5.1"
+chrono = "0.4"
+configparser = "3.0"
+ctrlc = "3.4"
+fitsio = "0.21"
+image = "0.25"
+log = "0.4"
 
 [build-dependencies]
 bindgen = "0.69"
