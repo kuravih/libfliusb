@@ -6,7 +6,7 @@ SRCS = libfli.o libfli-camera.o libfli-camera-parport.o libfli-camera-usb.o libf
 
 OBJS = $(SRCS:.c=.o)
 
-LIBTARGET = libfli-usb.a
+LIBTARGET = libfliusb.a
 
 all: $(LIBTARGET)
 
